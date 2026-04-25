@@ -4,18 +4,23 @@ from datetime import datetime
 from typing import Optional, List
 from decimal import Decimal
 
+
+class OrderItemCreate(BaseModel):
+    product_id: UUID
+    quantity: int
+
+
 class OrderItemBase(BaseModel):
     product_id: UUID
     quantity: int
     price: Decimal
 
-class OrderItemCreate(OrderItemBase):
-    pass
 
 class OrderItem(OrderItemBase):
     created_at: datetime
     updated_at: datetime
     model_config = ConfigDict(from_attributes=True)
+
 
 class OrderBase(BaseModel):
     phone_number: str
@@ -23,8 +28,10 @@ class OrderBase(BaseModel):
     delivery_type_id: int
     delivery_address: Optional[str] = None
 
+
 class OrderCreate(OrderBase):
     items: List[OrderItemCreate]
+
 
 class Order(OrderBase):
     id: UUID
@@ -36,15 +43,18 @@ class Order(OrderBase):
     updated_at: datetime
     is_deleted: bool
     model_config = ConfigDict(from_attributes=True)
-    
+
+
 class OrderTracking(Order):
     status_name: str
+
 
 class ReferenceData(BaseModel):
     id: int
     name: str
     description: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
+
 
 class FeedbackCreate(BaseModel):
     productId: UUID

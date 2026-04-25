@@ -1,8 +1,6 @@
-version: '3.8'
-
 services:
   catalog-service:
-    build: 
+    build:
       context: ./catalog_service
     ports:
       - "8080:8080"
@@ -55,4 +53,3 @@ services:
 networks:
   bulbstore-network:
     driver: bridge
-

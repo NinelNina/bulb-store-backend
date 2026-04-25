@@ -1,51 +1,51 @@
+import sys
 from fastapi import FastAPI, APIRouter, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+import time
+from sqlalchemy import text
 from app.database import engine, Base, SessionLocal
 from app import models
 from app.routes import orders
+from app.seed import seed_order_data
 
-def seed_reference_data(db: SessionLocal):
-    states = [
-        (1, 'IN_PROCESS', 'Order is being processed'),
-        (2, 'IN_TRANSIT', 'Order is on its way'),
-        (3, 'DELIVERED', 'Order has been delivered to site'),
-        (4, 'RECEIVED', 'Order has been received by customer'),
-        (5, 'REJECTED', 'Order has been rejected')
-    ]
-    for id, name, desc in states:
-        if not db.query(models.OrderState).filter(models.OrderState.id == id).first():
-            db.add(models.OrderState(id=id, name=name, description=desc))
-    
-    payments = [
-        (1, 'PENDING', 'Payment is pending'),
-        (2, 'PAID', 'Order is paid'),
-        (3, 'REFUNDED', 'Payment has been refunded'),
-        (4, 'CANCELLED', 'Payment was cancelled')
-    ]
-    for id, name, desc in payments:
-        if not db.query(models.PaymentState).filter(models.PaymentState.id == id).first():
-            db.add(models.PaymentState(id=id, name=name, description=desc))
-            
-    deliveries = [
-        (1, 'CDEK', 'CDEK delivery service'),
-        (2, 'YANDEX', 'Yandex delivery service'),
-        (3, 'POST', 'Russian Post'),
-        (4, 'BOXBERRY', 'Boxberry delivery service'),
-        (5, 'САМОВЫВОЗ', 'Local pickup')
-    ]
-    for id, name, desc in deliveries:
-        if not db.query(models.DeliveryType).filter(models.DeliveryType.id == id).first():
-            db.add(models.DeliveryType(id=id, name=name, description=desc))
-    
-    db.commit()
-
+# Create tables and Seed
+print("Initializing Database...")
 try:
-    Base.metadata.create_all(bind=engine)
-    db_session = SessionLocal()
-    seed_reference_data(db_session)
-    db_session.close()
+    # Wait for catalog-service to create the specific shared table
+    print("Waiting for Catalog Service to initialize 'products' table...")
+    retries = 10
+    product_table_exists = False
+
+    with engine.connect() as conn:
+        for _ in range(retries):
+            # Check if products table exists in postgres
+            result = conn.execute(text(
+                "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'products');"))
+            if result.scalar():
+                product_table_exists = True
+                break
+            time.sleep(2)
+            print("Still waiting for 'products' table...")
+
+    if not product_table_exists:
+        print(
+            "WARNING: 'products' table not found after waiting. Proceeding anyway, but ForeignKey creation might fail.")
+
+    # Do not attempt to create the 'products' table from Order Service,
+    # as Catalog Service owns it and should create the full schema.
+    tables_to_create = [
+        table for table in Base.metadata.sorted_tables
+        if table.name != "products"
+    ]
+    Base.metadata.create_all(bind=engine, tables=tables_to_create)
+
+    db = SessionLocal()
+    seed_order_data(db)
+    db.close()
+    print("Database initialization complete.")
 except Exception as e:
-    print(f"Error creating/seeding tables: {e}")
+    print(f"Error during DB init: {e}")
+    sys.exit(1)
 
 app = FastAPI(
     title="Order Service",
@@ -61,12 +61,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.get("/health")
 def health_check():
     return {"status": "ok", "service": "orders"}
 
-app.include_router(orders.router)
 
-# if __name__ == "__main__":
-#     import uvicorn
-#     uvicorn.run(app, host="0.0.0.0", port=8081)
+app.include_router(orders.router)

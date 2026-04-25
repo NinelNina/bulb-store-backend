@@ -1,13 +1,23 @@
+import sys
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.database import engine, Base
+from app.database import engine, Base, SessionLocal
+# Explicitly import models to register them with Base.metadata
 from app import models
 from app.routes import catalog
+from app.seed import seed_catalog_data
 
+# Create tables and Seed
+print("Initializing Database...")
 try:
     Base.metadata.create_all(bind=engine)
+    db = SessionLocal()
+    seed_catalog_data(db)
+    db.close()
+    print("Database initialization complete.")
 except Exception as e:
-    print(f"Error creating tables: {e}")
+    print(f"CRITICAL ERROR during DB init: {e}")
+    sys.exit(1)
 
 app = FastAPI(
     title="Catalog Service",
@@ -28,7 +38,3 @@ def health_check():
     return {"status": "ok", "service": "catalog"}
 
 app.include_router(catalog.router)
-
-# if __name__ == "__main__":
-#     import uvicorn
-#     uvicorn.run(app, host="0.0.0.0", port=8080)

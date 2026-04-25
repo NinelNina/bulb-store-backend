@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import date
-from ..database import get_db
-from .. import schemas
-from ..services.order_service import OrderService
+from app.database import get_db
+from app import schemas
+from app.services.order_service import OrderService
 from uuid import UUID
 
 router = APIRouter(prefix="/orders", tags=["orders"])
@@ -26,7 +26,7 @@ def get_payment_statuses(db: Session = Depends(get_db)):
     return OrderService.get_payment_statuses(db)
 
 @router.get("/tracking", response_model=schemas.OrderTracking)
-def track_order(orderNumber: str, phoneNumber: str, db: Session = Depends(get_db)):
+def track_order(orderNumber: Optional[str] = None, phoneNumber: Optional[str] = None, db: Session = Depends(get_db)):
     return OrderService.track_order(db, orderNumber, phoneNumber)
 
 @router.get("/{orderId}/tracking", response_model=schemas.OrderTracking)

@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from typing import List, Optional
 from datetime import date, datetime
 from app import models, schemas
@@ -72,11 +72,18 @@ class OrderService:
         return db.query(models.PaymentState).all()
 
     @staticmethod
-    def track_order(db: Session, order_number: str, phone_number: str) -> dict:
-        order = db.query(models.Order).filter(
-            models.Order.order_number == order_number,
-            models.Order.phone_number == phone_number
-        ).first()
+    def track_order(db: Session, order_number: Optional[str] = None, phone_number: Optional[str] = None) -> dict:
+        if not order_number and not phone_number:
+            raise HTTPException(status_code=400, detail="Must provide orderNumber or phoneNumber")
+
+        conditions = []
+        if order_number:
+            conditions.append(models.Order.order_number == order_number)
+        if phone_number:
+            phone_number = phone_number.replace(" ", "+")
+            conditions.append(models.Order.phone_number == phone_number)
+
+        order = db.query(models.Order).filter(or_(*conditions)).order_by(models.Order.created_at.desc()).first()
         if not order:
             raise HTTPException(status_code=404, detail="Order not found")
 

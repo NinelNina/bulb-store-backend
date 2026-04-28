@@ -6,19 +6,24 @@ from app import models, schemas
 from uuid import UUID
 import uuid
 import random
+import os
+import requests
 from fastapi import HTTPException
 
 
 class OrderService:
     @staticmethod
     def create_order(db: Session, order_data: schemas.OrderCreate) -> models.Order:
+        # 1. Generate unique order number
         while True:
             order_number = f"ORD-{uuid.uuid4().hex[:8].upper()}"
             if not db.query(models.Order).filter(models.Order.order_number == order_number).first():
                 break
 
+        # Calculate total and create items
         total_amount = 0
 
+        # Create order record
         db_order = models.Order(
             order_number=order_number,
             order_state_id=1,  # IN_PROCESS
@@ -32,32 +37,82 @@ class OrderService:
         db.add(db_order)
         db.flush()
 
-        for item in order_data.items:
-            product = db.query(models.Product).filter(models.Product.id == item.product_id).with_for_update().first()
-            if not product:
-                db.rollback()
-                raise HTTPException(status_code=404, detail=f"Product {item.product_id} not found")
-            if product.quantity < item.quantity:
-                db.rollback()
-                raise HTTPException(status_code=400, detail=f"Insufficient stock for product {item.product_id}")
+        CATALOG_SERVICE_URL = os.getenv("CATALOG_SERVICE_URL", "http://catalog-service:8080/catalog")
 
-            product.quantity -= item.quantity
+        reserved_items = []
 
-            item_price = product.price if product.price is not None else 0
-            total_amount += item_price * item.quantity
+        try:
+            for item in order_data.items:
+                # 1. Check availability and get product price
+                # First get product details for the price
+                product_response = requests.get(f"{CATALOG_SERVICE_URL}/products/{item.product_id}", timeout=5)
+                if product_response.status_code == 404:
+                    raise HTTPException(status_code=404, detail=f"Product {item.product_id} not found")
+                product_response.raise_for_status()
+                product_data = product_response.json()
 
-            db_item = models.OrderItem(
-                order_id=db_order.id,
-                product_id=item.product_id,
-                quantity=item.quantity,
-                price=item_price
-            )
-            db.add(db_item)
+                # Check availability
+                avail_response = requests.get(
+                    f"{CATALOG_SERVICE_URL}/products/{item.product_id}/availability?quantity={item.quantity}",
+                    timeout=5)
+                avail_response.raise_for_status()
+                avail_data = avail_response.json()
 
-        db_order.total_amount = total_amount
-        db.commit()
-        db.refresh(db_order)
-        return db_order
+                if not avail_data.get("available"):
+                    raise HTTPException(status_code=400, detail=f"Insufficient stock for product {item.product_id}")
+
+                # 2. Update stock using SUBTRACT
+                stock_response = requests.patch(
+                    f"{CATALOG_SERVICE_URL}/products/{item.product_id}/stock",
+                    json={"quantity": item.quantity, "operation": "SUBTRACT"},
+                    timeout=5
+                )
+                if stock_response.status_code == 400:
+                    raise HTTPException(status_code=400,
+                                        detail=f"Insufficient stock for product {item.product_id} during reservation")
+                stock_response.raise_for_status()
+
+                # Track successfully reserved items for compensation
+                reserved_items.append(item)
+
+                # Get actual price from product
+                item_price = float(product_data.get("price", 0))
+                total_amount += item_price * item.quantity
+
+                # Create order item
+                db_item = models.OrderItem(
+                    order_id=db_order.id,
+                    product_id=item.product_id,
+                    quantity=item.quantity,
+                    price=item_price
+                )
+                db.add(db_item)
+
+            db_order.total_amount = total_amount
+            db.commit()
+            db.refresh(db_order)
+            return db_order
+
+        except Exception as e:
+            # Rollback database
+            db.rollback()
+            # Compensate reserved items in catalog-service
+            for res_item in reserved_items:
+                try:
+                    requests.patch(
+                        f"{CATALOG_SERVICE_URL}/products/{res_item.product_id}/stock",
+                        json={"quantity": res_item.quantity, "operation": "ADD"},
+                        timeout=5
+                    )
+                except Exception as comp_e:
+                    # In a real system, you would log this to a dead letter queue or alerting system
+                    print(f"CRITICAL: Failed to compensate stock for {res_item.product_id}: {comp_e}")
+
+            if isinstance(e, HTTPException):
+                raise e
+            if isinstance(e, requests.RequestException):
+                raise HTTPException(status_code=503, detail=f"Catalog service unavailable: {str(e)}")
+            raise e
 
     @staticmethod
     def get_delivery_types(db: Session) -> List[models.DeliveryType]:
@@ -132,6 +187,20 @@ class OrderService:
         order = db.query(models.Order).filter(models.Order.id == order_id).first()
         if not order:
             raise HTTPException(status_code=404, detail="Order not found")
+
+        # If rejecting order, return stock
+        if order_state_id == 5 and order.order_state_id != 5:
+            CATALOG_SERVICE_URL = os.getenv("CATALOG_SERVICE_URL", "http://catalog-service:8080/catalog")
+            for item in order.items:
+                try:
+                    requests.patch(
+                        f"{CATALOG_SERVICE_URL}/products/{item.product_id}/stock",
+                        json={"quantity": item.quantity, "operation": "ADD"},
+                        timeout=5
+                    )
+                except requests.RequestException as e:
+                    print(f"Failed to refund stock for product {item.product_id} from order {order_id}: {e}")
+                    # Could log these failures for manual compensation.
 
         order.order_state_id = order_state_id
         db.commit()

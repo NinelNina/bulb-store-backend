@@ -2,16 +2,17 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from typing import List, Optional
 from uuid import UUID
-from .. import models, schemas
+from app import models, schemas
 from fastapi import HTTPException
+
 
 class CatalogService:
     @staticmethod
     def get_products(
-        db: Session,
-        page: int = 1,
-        size: int = 20,
-        category_id: Optional[UUID] = None
+            db: Session,
+            page: int = 1,
+            size: int = 20,
+            category_id: Optional[UUID] = None
     ) -> List[models.Product]:
         query = db.query(models.Product).filter(models.Product.is_deleted == False)
         if category_id:
@@ -20,17 +21,17 @@ class CatalogService:
 
     @staticmethod
     def search_products(
-        db: Session,
-        params: dict,
-        page: int = 1,
-        size: int = 20
+            db: Session,
+            params: dict,
+            page: int = 1,
+            size: int = 20
     ) -> List[models.Product]:
         query = db.query(models.Product).filter(models.Product.is_deleted == False)
-        
+
         q = params.get("q")
         if q:
             query = query.filter(or_(models.Product.name.ilike(f"%{q}%"), models.Product.description.ilike(f"%{q}%")))
-        
+
         if params.get("categoryId"):
             query = query.filter(models.Product.category_id == params.get("categoryId"))
         if params.get("socket"):
@@ -114,12 +115,17 @@ class CatalogService:
         db_product = CatalogService.get_product(db, product_id)
         quantity = stock_data.get("quantity", 0)
         operation = stock_data.get("operation", "SET")
-        
+
         if operation == "SET":
             db_product.quantity = quantity
         elif operation == "ADD":
             db_product.quantity += quantity
-        
+        elif operation == "SUBTRACT":
+            if db_product.quantity < quantity:
+                from fastapi import HTTPException
+                raise HTTPException(status_code=400, detail="Insufficient stock")
+            db_product.quantity -= quantity
+
         db.commit()
         db.refresh(db_product)
         return db_product
@@ -132,6 +138,7 @@ class CatalogService:
         db_product.is_deleted = True
         db.commit()
         return {"message": "Product deleted"}
+
 
 class CategoryService:
     @staticmethod

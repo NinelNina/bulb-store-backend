@@ -5,13 +5,6 @@ from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.database import Base
 
-class Product(Base):
-    __tablename__ = "products"
-    id = Column(UUID(as_uuid=True), primary_key=True)
-    name = Column(String)
-    quantity = Column(Integer)
-    price = Column(Numeric(10, 2))
-
 class OrderState(Base):
     __tablename__ = "order_state"
     id = Column(SmallInteger, primary_key=True)
@@ -52,7 +45,7 @@ class Order(Base):
 class OrderItem(Base):
     __tablename__ = "order_items"
     order_id = Column(UUID(as_uuid=True), ForeignKey("orders.id"), primary_key=True)
-    product_id = Column(UUID(as_uuid=True), ForeignKey("products.id"), primary_key=True)
+    product_id = Column(UUID(as_uuid=True), primary_key=True)
     quantity = Column(Integer, nullable=False)
     price = Column(Numeric(10, 2), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -64,7 +57,7 @@ class OrderFeedback(Base):
     __tablename__ = "order_feedback"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     order_id = Column(UUID(as_uuid=True), ForeignKey("orders.id"), nullable=False)
-    product_id = Column(UUID(as_uuid=True), ForeignKey("products.id"), nullable=False)
+    product_id = Column(UUID(as_uuid=True), nullable=False)
     description = Column(String)
     score = Column(SmallInteger, nullable=False) # 1-5
     created_at = Column(DateTime(timezone=True), server_default=func.now())

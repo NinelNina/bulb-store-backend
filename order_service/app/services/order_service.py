@@ -14,16 +14,13 @@ from fastapi import HTTPException
 class OrderService:
     @staticmethod
     def create_order(db: Session, order_data: schemas.OrderCreate) -> models.Order:
-        # 1. Generate unique order number
         while True:
             order_number = f"ORD-{uuid.uuid4().hex[:8].upper()}"
             if not db.query(models.Order).filter(models.Order.order_number == order_number).first():
                 break
 
-        # Calculate total and create items
         total_amount = 0
 
-        # Create order record
         db_order = models.Order(
             order_number=order_number,
             order_state_id=1,  # IN_PROCESS
@@ -43,15 +40,12 @@ class OrderService:
 
         try:
             for item in order_data.items:
-                # 1. Check availability and get product price
-                # First get product details for the price
                 product_response = requests.get(f"{CATALOG_SERVICE_URL}/products/{item.product_id}", timeout=5)
                 if product_response.status_code == 404:
                     raise HTTPException(status_code=404, detail=f"Product {item.product_id} not found")
                 product_response.raise_for_status()
                 product_data = product_response.json()
 
-                # Check availability
                 avail_response = requests.get(
                     f"{CATALOG_SERVICE_URL}/products/{item.product_id}/availability?quantity={item.quantity}",
                     timeout=5)
@@ -61,7 +55,6 @@ class OrderService:
                 if not avail_data.get("available"):
                     raise HTTPException(status_code=400, detail=f"Insufficient stock for product {item.product_id}")
 
-                # 2. Update stock using SUBTRACT
                 stock_response = requests.patch(
                     f"{CATALOG_SERVICE_URL}/products/{item.product_id}/stock",
                     json={"quantity": item.quantity, "operation": "SUBTRACT"},
@@ -72,14 +65,11 @@ class OrderService:
                                         detail=f"Insufficient stock for product {item.product_id} during reservation")
                 stock_response.raise_for_status()
 
-                # Track successfully reserved items for compensation
                 reserved_items.append(item)
 
-                # Get actual price from product
                 item_price = float(product_data.get("price", 0))
                 total_amount += item_price * item.quantity
 
-                # Create order item
                 db_item = models.OrderItem(
                     order_id=db_order.id,
                     product_id=item.product_id,
@@ -94,9 +84,7 @@ class OrderService:
             return db_order
 
         except Exception as e:
-            # Rollback database
             db.rollback()
-            # Compensate reserved items in catalog-service
             for res_item in reserved_items:
                 try:
                     requests.patch(
@@ -105,7 +93,6 @@ class OrderService:
                         timeout=5
                     )
                 except Exception as comp_e:
-                    # In a real system, you would log this to a dead letter queue or alerting system
                     print(f"CRITICAL: Failed to compensate stock for {res_item.product_id}: {comp_e}")
 
             if isinstance(e, HTTPException):
@@ -188,7 +175,6 @@ class OrderService:
         if not order:
             raise HTTPException(status_code=404, detail="Order not found")
 
-        # If rejecting order, return stock
         if order_state_id == 5 and order.order_state_id != 5:
             CATALOG_SERVICE_URL = os.getenv("CATALOG_SERVICE_URL", "http://catalog-service:8080/catalog")
             for item in order.items:
@@ -200,7 +186,6 @@ class OrderService:
                     )
                 except requests.RequestException as e:
                     print(f"Failed to refund stock for product {item.product_id} from order {order_id}: {e}")
-                    # Could log these failures for manual compensation.
 
         order.order_state_id = order_state_id
         db.commit()

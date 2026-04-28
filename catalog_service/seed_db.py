@@ -5,8 +5,6 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.sql import func
 import os
 
-# Database Connection
-# Use db:5432 if running inside Docker, localhost:5436 if running from host
 DB_HOST = os.getenv("POSTGRES_HOST", "db")
 DB_PORT = os.getenv("POSTGRES_PORT", "5432")
 DB_USER = os.getenv("POSTGRES_USER", "postgres")
@@ -20,7 +18,6 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 
-# Models (Re-defined for seeding to avoid import issues)
 class Category(Base):
     __tablename__ = "categories"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -45,13 +42,11 @@ class Product(Base):
 
 
 def seed():
-    # Create tables before seeding
     print("Ensuring tables are created...")
     Base.metadata.create_all(bind=engine)
 
     db = SessionLocal()
     try:
-        # 1. Create Categories
         categories_data = [
             {"name": "Светодиодные лампы (LED)"},
             {"name": "Умные лампы (Smart)"},
@@ -72,7 +67,6 @@ def seed():
         db.commit()
         print("Categories seeded.")
 
-        # 2. Create Products
         products_data = [
             {
                 "name": "Philips LED Classic E27",

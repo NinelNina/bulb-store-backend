@@ -4,7 +4,6 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import sessionmaker, declarative_base
 import os
 
-# Database Connection
 DB_HOST = os.getenv("POSTGRES_HOST", "db")
 DB_PORT = os.getenv("POSTGRES_PORT", "5432")
 DB_USER = os.getenv("POSTGRES_USER", "postgres")
@@ -40,13 +39,11 @@ class DeliveryType(Base):
 
 
 def seed():
-    # Create tables before seeding
     print("Ensuring tables are created...")
     Base.metadata.create_all(bind=engine)
 
     db = SessionLocal()
     try:
-        # Seed Order States
         states = [
             (1, 'IN_PROCESS', 'Order is being processed'),
             (2, 'IN_TRANSIT', 'Order is on its way'),
@@ -58,7 +55,6 @@ def seed():
             if not db.query(OrderState).filter(OrderState.id == id).first():
                 db.add(OrderState(id=id, name=name, description=desc))
 
-        # Seed Payment States
         payments = [
             (1, 'PENDING', 'Payment is pending'),
             (2, 'PAID', 'Order is paid'),
@@ -69,7 +65,6 @@ def seed():
             if not db.query(PaymentState).filter(PaymentState.id == id).first():
                 db.add(PaymentState(id=id, name=name, description=desc))
 
-        # Seed Delivery Types
         deliveries = [
             (1, 'CDEK', 'CDEK delivery service'),
             (2, 'YANDEX', 'Yandex delivery service'),

@@ -38,61 +38,61 @@ def seed_order_data(db: Session):
     db.commit()
     print("Order reference data seeded.")
 
-    if not db.query(models.Order).first():
-        products = db.query(models.Product).limit(3).all()
-        if len(products) > 0:
-            order1 = models.Order(
-                order_number="ORD-0001",
-                order_state_id=1,
-                phone_number="+79998887766",
-                user_full_name="Иван Иванов",
-                delivery_type_id=1,
-                payment_state_id=1,
-                total_amount=0,
-                delivery_address="г. Москва, ул. Пушкина, д. 10, кв. 5"
-            )
-            db.add(order1)
-            db.flush()
-
-            total = 0
-            for prod in products:
-                qty = 2
-                price = prod.price if prod.price else 500.0
-                item = models.OrderItem(
-                    order_id=order1.id,
-                    product_id=prod.id,
-                    quantity=qty,
-                    price=price
-                )
-                db.add(item)
-                total += qty * price
-
-            order1.total_amount = total
-
-            order2 = models.Order(
-                order_number="ORD-0002",
-                order_state_id=3,
-                phone_number="+79991112233",
-                user_full_name="Петр Петров",
-                delivery_type_id=2,
-                payment_state_id=2,
-                total_amount=0,
-                delivery_address="г. Санкт-Петербург, Невский пр., д. 1, кв. 1"
-            )
-            db.add(order2)
-            db.flush()
-
-            prod = products[0]
-            qty2 = 1
-            price2 = prod.price if prod.price else 500.0
-            item2 = models.OrderItem(
-                order_id=order2.id,
-                product_id=prod.id,
-                quantity=qty2,
-                price=price2
-            )
-            db.add(item2)
-            order2.total_amount = qty2 * price2
-
-            db.commit()
-            print("Test orders seeded.")
+    # if not db.query(models.Order).first():
+    #     products = db.query(models.Product).limit(3).all()
+    #     if len(products) > 0:
+    #         order1 = models.Order(
+    #             order_number="ORD-0001",
+    #             order_state_id=1,
+    #             phone_number="+79998887766",
+    #             user_full_name="Иван Иванов",
+    #             delivery_type_id=1,
+    #             payment_state_id=1,
+    #             total_amount=0,
+    #             delivery_address="г. Москва, ул. Пушкина, д. 10, кв. 5"
+    #         )
+    #         db.add(order1)
+    #         db.flush()
+    #
+    #         total = 0
+    #         for prod in products:
+    #             qty = 2
+    #             price = prod.price if prod.price else 500.0
+    #             item = models.OrderItem(
+    #                 order_id=order1.id,
+    #                 product_id=prod.id,
+    #                 quantity=qty,
+    #                 price=price
+    #             )
+    #             db.add(item)
+    #             total += qty * price
+    #
+    #         order1.total_amount = total
+    #
+    #         order2 = models.Order(
+    #             order_number="ORD-0002",
+    #             order_state_id=3,
+    #             phone_number="+79991112233",
+    #             user_full_name="Петр Петров",
+    #             delivery_type_id=2,
+    #             payment_state_id=2,
+    #             total_amount=0,
+    #             delivery_address="г. Санкт-Петербург, Невский пр., д. 1, кв. 1"
+    #         )
+    #         db.add(order2)
+    #         db.flush()
+    #
+    #         prod = products[0]
+    #         qty2 = 1
+    #         price2 = prod.price if prod.price else 500.0
+    #         item2 = models.OrderItem(
+    #             order_id=order2.id,
+    #             product_id=prod.id,
+    #             quantity=qty2,
+    #             price=price2
+    #         )
+    #         db.add(item2)
+    #         order2.total_amount = qty2 * price2
+    #
+    #         db.commit()
+    #         print("Test orders seeded.")

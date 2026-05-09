@@ -4,7 +4,6 @@ from app import models
 
 
 def seed_catalog_data(db: Session):
-    # 1. Categories
     categories_data = [
         {"name": "Светодиодные лампы (LED)"},
         {"name": "Умные лампы (Smart)"},
@@ -25,19 +24,66 @@ def seed_catalog_data(db: Session):
 
     db.commit()
 
-    # 2. Products
     products_data = [
         {
             "name": "Philips LED Classic E27",
-            "socket": "E27", "power": 8, "color_temperature": 2700, "brightness": 806,
-            "shape": "A60", "description": "Классическая теплая лампа", "price": 450.00,
-            "quantity": 100, "category": "Светодиодные лампы (LED)"
+            "socket": "E27",
+            "power": 8,
+            "color_temperature": 2700,
+            "brightness": 806,
+            "shape": "A60",
+            "description": "Классическая теплая лампа для дома",
+            "price": 450.00,
+            "quantity": 100,
+            "category": "Светодиодные лампы (LED)"
         },
         {
             "name": "Xiaomi Mi Smart Bulb Essential",
-            "socket": "E27", "power": 9, "color_temperature": 6500, "brightness": 950,
-            "shape": "A60", "description": "RGB с Wi-Fi", "price": 1290.00,
-            "quantity": 45, "category": "Умные лампы (Smart)"
+            "socket": "E27",
+            "power": 9,
+            "color_temperature": 6500,
+            "brightness": 950,
+            "shape": "A60",
+            "description": "Умная лампа RGB с управлением через Wi-Fi",
+            "price": 1290.00,
+            "quantity": 45,
+            "category": "Умные лампы (Smart)"
+        },
+        {
+            "name": "Gauss Filament Amber",
+            "socket": "E14",
+            "power": 5,
+            "color_temperature": 2400,
+            "brightness": 420,
+            "shape": "C35",
+            "description": "Золотистая ретро-лампа 'свеча на ветру'",
+            "price": 320.00,
+            "quantity": 30,
+            "category": "Винтажные ламп (Filament)"
+        },
+        {
+            "name": "Yeelight Smart LED Bulb W3",
+            "socket": "E27",
+            "power": 8,
+            "color_temperature": 4000,
+            "brightness": 900,
+            "shape": "A60",
+            "description": "Экономичная умная лампа",
+            "price": 890.00,
+            "quantity": 60,
+            "category": "Умные лампы (Smart)"
+        },
+        {
+            "name": "Osram Retrofit LED",
+            "socket": "GU10",
+            "power": 4,
+            "color_temperature": 3000,
+            "brightness": 350,
+            "shape": "Reflector",
+            "description": "Точечный светильник для встраиваемых потолков",
+            "price": 190.00,
+            "quantity": 200,
+            "category": "Светодиодные лампы (LED)"
         }
     ]
 

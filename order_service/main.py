@@ -8,44 +8,25 @@ from app import models
 from app.routes import orders
 from app.seed import seed_order_data
 
-# Create tables and Seed
 print("Initializing Database...")
-try:
-    # Wait for catalog-service to create the specific shared table
-    print("Waiting for Catalog Service to initialize 'products' table...")
-    retries = 10
-    product_table_exists = False
+max_retries = 10
+retry_delay = 5
+for attempt in range(max_retries):
+    try:
+        Base.metadata.create_all(bind=engine)
 
-    with engine.connect() as conn:
-        for _ in range(retries):
-            # Check if products table exists in postgres
-            result = conn.execute(text(
-                "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'products');"))
-            if result.scalar():
-                product_table_exists = True
-                break
-            time.sleep(2)
-            print("Still waiting for 'products' table...")
-
-    if not product_table_exists:
-        print(
-            "WARNING: 'products' table not found after waiting. Proceeding anyway, but ForeignKey creation might fail.")
-
-    # Do not attempt to create the 'products' table from Order Service,
-    # as Catalog Service owns it and should create the full schema.
-    tables_to_create = [
-        table for table in Base.metadata.sorted_tables
-        if table.name != "products"
-    ]
-    Base.metadata.create_all(bind=engine, tables=tables_to_create)
-
-    db = SessionLocal()
-    seed_order_data(db)
-    db.close()
-    print("Database initialization complete.")
-except Exception as e:
-    print(f"Error during DB init: {e}")
-    sys.exit(1)
+        db = SessionLocal()
+        seed_order_data(db)
+        db.close()
+        print("Database initialization complete.")
+        break
+    except Exception as e:
+        print(f"Attempt {attempt + 1}/{max_retries} failed: {e}")
+        if attempt < max_retries - 1:
+            time.sleep(retry_delay)
+        else:
+            print("CRITICAL ERROR: Database initialization failed after max retries.")
+            sys.exit(1)
 
 app = FastAPI(
     title="Order Service",
@@ -68,3 +49,8 @@ def health_check():
 
 
 app.include_router(orders.router)
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(app, host="0.0.0.0", port=8081)
